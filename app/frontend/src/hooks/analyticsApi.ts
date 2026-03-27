@@ -27,15 +27,61 @@ export interface AssetSlice {
   color: string;
 }
 
+export interface UserGrowthDataPoint {
+  date: string;
+  newUsers: number;
+  activeUsers: number;
+  totalUsers: number;
+}
+
+export interface ConversionDataPoint {
+  date: string;
+  linkViews: number;
+  paymentAttempts: number;
+  completedPayments: number;
+  conversionRate: number;
+}
+
+export interface GeographicData {
+  country: string;
+  code: string;
+  volume: number;
+  transactions: number;
+  users: number;
+}
+
+export interface TopPerformer {
+  username: string;
+  volume: number;
+  transactions: number;
+  avgTransactionSize: number;
+}
+
+export interface PerformanceMetrics {
+  avgProcessingTime: number;
+  successRate: number;
+  errorRate: number;
+  uptime: number;
+}
+
 export interface AnalyticsData {
   volume: VolumeDataPoint[];
   txCount: TxCountDataPoint[];
   assetDist: AssetSlice[];
+  userGrowth: UserGrowthDataPoint[];
+  conversionMetrics: ConversionDataPoint[];
+  geographicData: GeographicData[];
+  topPerformers: TopPerformer[];
+  performance: PerformanceMetrics;
   summary: {
     totalVolume: number;
     totalTx: number;
     avgTxSize: number;
     changeVolumePercent: number;
+    totalUsers: number;
+    activeUsers: number;
+    conversionRate: number;
+    successRate: number;
   };
 }
 
@@ -57,39 +103,112 @@ function toTx(series: VolumeDataPoint[]): TxCountDataPoint[] {
   return series.map((d) => ({ date: d.date, count: randomBetween(4, 42) }));
 }
 
+function buildUserGrowth(points: number, labelFn: (i: number) => string): UserGrowthDataPoint[] {
+  let totalUsers = 1000;
+  return Array.from({ length: points }, (_, i) => {
+    const newUsers = randomBetween(5, 50);
+    const activeUsers = Math.round(totalUsers * randomBetween(0.3, 0.7));
+    totalUsers += newUsers;
+    return { date: labelFn(i), newUsers, activeUsers, totalUsers };
+  });
+}
+
+function buildConversionMetrics(points: number, labelFn: (i: number) => string): ConversionDataPoint[] {
+  return Array.from({ length: points }, (_, i) => {
+    const linkViews = randomBetween(100, 500);
+    const paymentAttempts = Math.round(linkViews * randomBetween(0.1, 0.3));
+    const completedPayments = Math.round(paymentAttempts * randomBetween(0.7, 0.95));
+    const conversionRate = parseFloat(((completedPayments / linkViews) * 100).toFixed(2));
+    return { date: labelFn(i), linkViews, paymentAttempts, completedPayments, conversionRate };
+  });
+}
+
+function buildGeographicData(): GeographicData[] {
+  const countries = [
+    { name: "United States", code: "US" },
+    { name: "United Kingdom", code: "GB" },
+    { name: "Germany", code: "DE" },
+    { name: "France", code: "FR" },
+    { name: "Canada", code: "CA" },
+    { name: "Australia", code: "AU" },
+    { name: "Japan", code: "JP" },
+    { name: "Singapore", code: "SG" },
+  ];
+  
+  return countries.map(country => ({
+    ...country,
+    volume: randomBetween(500, 5000),
+    transactions: randomBetween(20, 200),
+    users: randomBetween(10, 100),
+  }));
+}
+
+function buildTopPerformers(): TopPerformer[] {
+  const usernames = ["alice", "bob", "charlie", "diana", "eve"];
+  return usernames.map(username => ({
+    username,
+    volume: randomBetween(1000, 10000),
+    transactions: randomBetween(10, 100),
+    avgTransactionSize: randomBetween(50, 500),
+  })).sort((a, b) => b.volume - a.volume);
+}
+
+function buildPerformanceMetrics(): PerformanceMetrics {
+  return {
+    avgProcessingTime: randomBetween(100, 500),
+    successRate: parseFloat(randomBetween(95, 99).toFixed(2)),
+    errorRate: parseFloat(randomBetween(1, 5).toFixed(2)),
+    uptime: parseFloat(randomBetween(99.5, 99.9).toFixed(2)),
+  };
+}
+
 // ─── data factories ───────────────────────────────────────────────────────────
 
 const now = new Date();
 
 function makeData(range: DateRange): Omit<AnalyticsData, "summary"> {
   let volume: VolumeDataPoint[];
+  let points: number;
+  let labelFn: (i: number) => string;
 
   if (range === "24h") {
-    volume = buildSeries(24, (i) => `${String(i).padStart(2, "0")}:00`);
+    points = 24;
+    labelFn = (i) => `${String(i).padStart(2, "0")}:00`;
+    volume = buildSeries(points, labelFn);
   } else if (range === "7d") {
-    volume = buildSeries(7, (i) => {
+    points = 7;
+    labelFn = (i) => {
       const d = new Date(now);
       d.setDate(d.getDate() - (6 - i));
       return d.toLocaleDateString("en-US", { weekday: "short" });
-    });
+    };
+    volume = buildSeries(points, labelFn);
   } else if (range === "30d") {
-    volume = buildSeries(30, (i) => {
+    points = 30;
+    labelFn = (i) => {
       const d = new Date(now);
       d.setDate(d.getDate() - (29 - i));
       return `${d.getMonth() + 1}/${d.getDate()}`;
-    });
+    };
+    volume = buildSeries(points, labelFn);
   } else {
-    // all time — 12 months
-    volume = buildSeries(12, (i) => {
+    points = 12;
+    labelFn = (i) => {
       const d = new Date(now);
       d.setMonth(d.getMonth() - (11 - i));
       return d.toLocaleDateString("en-US", { month: "short" });
-    });
+    };
+    volume = buildSeries(points, labelFn);
   }
 
   return {
     volume,
     txCount: toTx(volume),
+    userGrowth: buildUserGrowth(points, labelFn),
+    conversionMetrics: buildConversionMetrics(points, labelFn),
+    geographicData: buildGeographicData(),
+    topPerformers: buildTopPerformers(),
+    performance: buildPerformanceMetrics(),
     assetDist: [
       { name: "USDC", value: randomBetween(48, 62), color: "#6366f1" },
       { name: "XLM",  value: randomBetween(25, 35), color: "#8b5cf6" },
@@ -101,26 +220,34 @@ function makeData(range: DateRange): Omit<AnalyticsData, "summary"> {
 // ─── public API ───────────────────────────────────────────────────────────────
 
 export async function fetchAnalytics(range: DateRange): Promise<AnalyticsData> {
-  // Simulates network latency; replace body with real fetch when backend is ready:
-  // const res = await fetch(`/api/analytics?range=${range}`);
-  // const json = await res.json();
-  // return json as AnalyticsData;
   await new Promise((r) => setTimeout(r, 600));
 
-  const { volume, txCount, assetDist } = makeData(range);
+  const { volume, txCount, assetDist, userGrowth, conversionMetrics, geographicData, topPerformers, performance } = makeData(range);
 
   const totalVolume = volume.reduce((s, d) => s + d.total, 0);
   const totalTx = txCount.reduce((s, d) => s + d.count, 0);
+  const totalUsers = userGrowth[userGrowth.length - 1]?.totalUsers || 0;
+  const activeUsers = userGrowth[userGrowth.length - 1]?.activeUsers || 0;
+  const avgConversionRate = conversionMetrics.reduce((s, d) => s + d.conversionRate, 0) / conversionMetrics.length;
 
   return {
     volume,
     txCount,
     assetDist,
+    userGrowth,
+    conversionMetrics,
+    geographicData,
+    topPerformers,
+    performance,
     summary: {
       totalVolume,
       totalTx,
       avgTxSize: Math.round(totalVolume / Math.max(totalTx, 1)),
       changeVolumePercent: parseFloat((Math.random() * 40 - 10).toFixed(1)),
+      totalUsers,
+      activeUsers,
+      conversionRate: parseFloat(avgConversionRate.toFixed(2)),
+      successRate: performance.successRate,
     },
   };
 }

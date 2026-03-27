@@ -7,6 +7,7 @@ import { mockFetch } from "@/hooks/mockApi";
 import { useEffect, useState } from "react";
 import { fetchUserBids, fetchUserListings, UserBid, UserListing, formatCountdown } from "@/hooks/marketplaceApi";
 import AnalyticsDashboard from "@/components/AnalyticsDashboard";
+import AdvancedAnalyticsDashboard from "@/components/AdvancedAnalyticsDashboard";
 
 type DashboardResponse = {
   items: Array<Record<string, unknown>>;
@@ -16,6 +17,7 @@ export default function Dashboard() {
   const { error, loading, callApi } = useApi<DashboardResponse>();
   const [userBids, setUserBids] = useState<UserBid[]>([]);
   const [userListings, setUserListings] = useState<UserListing[]>([]);
+  const [analyticsView, setAnalyticsView] = useState<'basic' | 'advanced'>('basic');
 
   useEffect(() => {
     callApi(() =>
@@ -130,7 +132,33 @@ export default function Dashboard() {
 
         {/* ANALYTICS DASHBOARD */}
         <div className="mb-10 md:mb-16">
-          <AnalyticsDashboard />
+          {/* Analytics View Toggle */}
+          <div className="flex justify-end mb-4">
+            <div className="inline-flex gap-1 p-1 rounded-xl bg-white/5 border border-white/5">
+              <button
+                onClick={() => setAnalyticsView('basic')}
+                className={`px-3 py-1.5 text-xs font-black rounded-lg transition-all ${
+                  analyticsView === 'basic'
+                    ? "bg-indigo-500 text-white shadow-lg shadow-indigo-500/20"
+                    : "text-neutral-500 hover:text-white hover:bg-white/5"
+                }`}
+              >
+                Basic Analytics
+              </button>
+              <button
+                onClick={() => setAnalyticsView('advanced')}
+                className={`px-3 py-1.5 text-xs font-black rounded-lg transition-all ${
+                  analyticsView === 'advanced'
+                    ? "bg-indigo-500 text-white shadow-lg shadow-indigo-500/20"
+                    : "text-neutral-500 hover:text-white hover:bg-white/5"
+                }`}
+              >
+                Advanced Analytics
+              </button>
+            </div>
+          </div>
+
+          {analyticsView === 'basic' ? <AnalyticsDashboard /> : <AdvancedAnalyticsDashboard />}
         </div>
 
         {/* TABLE */}

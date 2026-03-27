@@ -162,4 +162,94 @@ export class TransactionsService {
       simulationLatencyMs,
     };
   }
+
+  // Analytics-specific methods
+  async getVolumeData(startDate: Date, endDate: Date, interval: string): Promise<any[]> {
+    // This would typically query the database for transaction volume data
+    // For now, returning mock data structure
+    const points = this.getDataPointCount(interval);
+    return Array.from({ length: points }, (_, i) => {
+      const date = this.getDateForIndex(startDate, i, interval);
+      const volumeUSDC = Math.floor(Math.random() * 1800) + 200;
+      const volumeXLM = Math.floor(Math.random() * 600) + 80;
+      
+      return {
+        date,
+        volumeUSDC,
+        volumeXLM,
+        total: volumeUSDC + volumeXLM,
+      };
+    });
+  }
+
+  async getTransactionCountData(startDate: Date, endDate: Date, interval: string): Promise<any[]> {
+    // This would typically query the database for transaction count data
+    const points = this.getDataPointCount(interval);
+    return Array.from({ length: points }, (_, i) => {
+      const date = this.getDateForIndex(startDate, i, interval);
+      const count = Math.floor(Math.random() * 42) + 4;
+      
+      return {
+        date,
+        count,
+      };
+    });
+  }
+
+  async getAssetDistribution(startDate: Date, endDate: Date): Promise<any[]> {
+    // This would typically query the database for asset distribution
+    return [
+      { name: "USDC", value: Math.floor(Math.random() * 15) + 48, color: "#6366f1" },
+      { name: "XLM", value: Math.floor(Math.random() * 10) + 25, color: "#8b5cf6" },
+      { name: "Other", value: Math.floor(Math.random() * 10) + 5, color: "#334155" },
+    ];
+  }
+
+  async getTopPerformers(startDate: Date, endDate: Date): Promise<any[]> {
+    // This would typically query the database for top performing users
+    const usernames = ["alice", "bob", "charlie", "diana", "eve"];
+    return usernames.map(username => ({
+      username,
+      volume: Math.floor(Math.random() * 9000) + 1000,
+      transactions: Math.floor(Math.random() * 90) + 10,
+      avgTransactionSize: Math.floor(Math.random() * 450) + 50,
+    })).sort((a, b) => b.volume - a.volume);
+  }
+
+  async getVolume(startDate: Date, endDate: Date): Promise<number> {
+    // This would typically sum up all transaction volumes in the date range
+    return Math.floor(Math.random() * 50000) + 10000;
+  }
+
+  async getTransactionCount(startDate: Date, endDate: Date): Promise<number> {
+    // This would typically count all transactions in the date range
+    return Math.floor(Math.random() * 500) + 100;
+  }
+
+  private getDataPointCount(interval: string): number {
+    switch (interval) {
+      case "hour": return 24;
+      case "day": return 30;
+      case "month": return 12;
+      default: return 30;
+    }
+  }
+
+  private getDateForIndex(startDate: Date, index: number, interval: string): string {
+    const date = new Date(startDate);
+    
+    switch (interval) {
+      case "hour":
+        date.setHours(date.getHours() + index);
+        return date.toISOString().slice(0, 13) + ":00";
+      case "day":
+        date.setDate(date.getDate() + index);
+        return date.toISOString().slice(0, 10);
+      case "month":
+        date.setMonth(date.getMonth() + index);
+        return date.toISOString().slice(0, 7);
+      default:
+        return date.toISOString().slice(0, 10);
+    }
+  }
 }
