@@ -93,4 +93,62 @@ export class UsernamesService {
   async listByPublicKey(publicKey: string): Promise<UsernameRow[]> {
     return this.supabase.listUsernamesByPublicKey(publicKey) as Promise<UsernameRow[]>;
   }
+
+  /**
+   * Get analytics data for user growth
+   */
+  async getUserGrowthData(startDate: Date, endDate: Date, interval: string): Promise<any[]> {
+    // This would typically query the database for user registration data
+    // For now, returning mock data structure
+    const points = this.getDataPointCount(interval);
+    return Array.from({ length: points }, (_, i) => {
+      const date = this.getDateForIndex(startDate, i, interval);
+      const newUsers = Math.floor(Math.random() * 50) + 5;
+      const totalUsers = 1000 + (i * newUsers);
+      const activeUsers = Math.floor(totalUsers * (Math.random() * 0.4 + 0.3));
+      
+      return {
+        date,
+        newUsers,
+        activeUsers,
+        totalUsers,
+      };
+    });
+  }
+
+  /**
+   * Get active user count for a date range
+   */
+  async getActiveUserCount(startDate: Date, endDate: Date): Promise<number> {
+    // This would typically query for active users based on transactions or logins
+    // For now, returning a reasonable mock value
+    return Math.floor(Math.random() * 500) + 100;
+  }
+
+  private getDataPointCount(interval: string): number {
+    switch (interval) {
+      case "hour": return 24;
+      case "day": return 30;
+      case "month": return 12;
+      default: return 30;
+    }
+  }
+
+  private getDateForIndex(startDate: Date, index: number, interval: string): string {
+    const date = new Date(startDate);
+    
+    switch (interval) {
+      case "hour":
+        date.setHours(date.getHours() + index);
+        return date.toISOString().slice(0, 13) + ":00";
+      case "day":
+        date.setDate(date.getDate() + index);
+        return date.toISOString().slice(0, 10);
+      case "month":
+        date.setMonth(date.getMonth() + index);
+        return date.toISOString().slice(0, 7);
+      default:
+        return date.toISOString().slice(0, 10);
+    }
+  }
 }
