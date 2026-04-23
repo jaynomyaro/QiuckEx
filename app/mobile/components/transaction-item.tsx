@@ -6,6 +6,7 @@ import {
     TouchableOpacity,
     Clipboard,
 } from 'react-native';
+import { useRouter } from 'expo-router';
 import type { TransactionItem as TransactionItemType } from '../types/transaction';
 
 interface Props {
@@ -35,15 +36,27 @@ function shortenHash(hash: string): string {
     return `${hash.slice(0, 6)}…${hash.slice(-6)}`;
 }
 
-export default function TransactionItem({ item }: Props) {
+export default function TransactionItem({ item, accountId }: Props) {
+    const router = useRouter();
     const assetLabel = formatAsset(item.asset);
 
     const handleCopyHash = () => {
         Clipboard.setString(item.txHash);
     };
 
+    const handlePress = () => {
+        router.push({
+            pathname: '/transaction-detail',
+            params: {
+                accountId,
+                txHash: item.txHash,
+                pagingToken: item.pagingToken,
+            },
+        });
+    };
+
     return (
-        <View style={styles.row}>
+        <TouchableOpacity style={styles.row} onPress={handlePress} activeOpacity={0.7}>
             {/* Left: icon + asset */}
             <View style={styles.iconWrap}>
                 <Text style={styles.assetIcon}>{assetLabel.slice(0, 3)}</Text>
@@ -72,7 +85,7 @@ export default function TransactionItem({ item }: Props) {
                 </Text>
                 <Text style={styles.assetCode}>{assetLabel}</Text>
             </View>
-        </View>
+        </TouchableOpacity>
     );
 }
 
