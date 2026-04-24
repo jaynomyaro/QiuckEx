@@ -95,6 +95,13 @@ export default function HomeScreen() {
             <Text style={styles.secondaryButtonText}>Transaction History</Text>
           </TouchableOpacity>
         </Link>
+
+        {/* Marketplace */}
+        <Link href="/marketplace" asChild>
+          <TouchableOpacity style={styles.marketplaceButton}>
+            <Text style={styles.marketplaceButtonText}>Username Marketplace</Text>
+          </TouchableOpacity>
+        </Link>
       </View>
     </SafeAreaView>
   );
@@ -185,6 +192,22 @@ const styles = StyleSheet.create({
   },
   secondaryButtonText: {
     color: "#000",
+    fontSize: 18,
+    fontWeight: "600",
+  },
+
+  /* Marketplace Button */
+  marketplaceButton: {
+    backgroundColor: "#6366F1",
+    paddingVertical: 16,
+    paddingHorizontal: 32,
+    borderRadius: 8,
+    width: "100%",
+    alignItems: "center",
+    marginBottom: 12,
+  },
+  marketplaceButtonText: {
+    color: "#fff",
     fontSize: 18,
     fontWeight: "600",
   },
