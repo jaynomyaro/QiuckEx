@@ -99,6 +99,7 @@ function AppShell() {
         <Stack.Screen name="wallet-connect" />
         <Stack.Screen name="scan-to-pay" />
         <Stack.Screen name="payment-confirmation" />
+        <Stack.Screen name="payment-confirmation-v2" />
         <Stack.Screen name="transactions" />
         <Stack.Screen name="transaction-detail" />
         <Stack.Screen name="marketplace" />
