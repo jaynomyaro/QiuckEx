@@ -17,6 +17,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTransactions } from '../hooks/use-transactions';
 import type { TransactionItem } from '../types/transaction';
 import { ErrorState } from '../components/resilience/error-state';
+import { PathPaymentUtils } from '../utils/path-payment-utils';
 
 const { width } = Dimensions.get('window');
 
@@ -120,13 +121,31 @@ export default function TransactionDetailScreen() {
     const handleShare = async () => {
         if (!transaction) return;
 
-        const shareContent = `
+        const isPathPayment = PathPaymentUtils.isPathPayment(transaction);
+        const primaryAsset = isPathPayment ? PathPaymentUtils.getPrimaryAsset(transaction) : formatAsset(transaction.asset);
+        const primaryAmount = isPathPayment ? PathPaymentUtils.getPrimaryAmount(transaction) : transaction.amount;
+        const operationTypeLabel = PathPaymentUtils.getOperationTypeLabel(transaction);
+
+        let shareContent = `
 Transaction Details
 ==================
-Amount: ${parseFloat(transaction.amount).toFixed(2)} ${formatAsset(transaction.asset)}
+Operation: ${operationTypeLabel}
+Amount: ${parseFloat(primaryAmount).toFixed(2)} ${primaryAsset}`;
+
+        if (isPathPayment) {
+            const secondaryAmount = PathPaymentUtils.getSecondaryAmount(transaction);
+            const secondaryAsset = PathPaymentUtils.getSecondaryAsset(transaction);
+            shareContent += `
+Converted to: ${parseFloat(secondaryAmount).toFixed(2)} ${secondaryAsset}
+Path: ${PathPaymentUtils.createPathDescription(transaction)}`;
+        }
+
+        shareContent += `
 Hash: ${transaction.txHash}
 Date: ${formatFullDate(transaction.timestamp)}
 ${transaction.memo ? `Memo: ${transaction.memo}` : ''}
+${transaction.from ? `From: ${transaction.from}` : ''}
+${transaction.to ? `To: ${transaction.to}` : ''}
 ${transaction.asset.includes(':') ? `Asset: ${transaction.asset}` : ''}
 
 View on Stellar Explorer: https://stellar.expert/explorer/public/tx/${transaction.txHash}
@@ -223,7 +242,10 @@ View on Stellar Explorer: https://stellar.expert/explorer/public/tx/${transactio
         );
     }
 
-    const assetLabel = formatAsset(transaction.asset);
+    const isPathPayment = PathPaymentUtils.isPathPayment(transaction);
+    const primaryAsset = isPathPayment ? PathPaymentUtils.getPrimaryAsset(transaction) : formatAsset(transaction.asset);
+    const primaryAmount = isPathPayment ? PathPaymentUtils.getPrimaryAmount(transaction) : transaction.amount;
+    const operationTypeLabel = PathPaymentUtils.getOperationTypeLabel(transaction);
 
     return (
         <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
@@ -245,11 +267,19 @@ View on Stellar Explorer: https://stellar.expert/explorer/public/tx/${transactio
             <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
                 {/* Amount Card */}
                 <View style={styles.amountCard}>
-                    <Text style={styles.amount}>{parseFloat(transaction.amount).toFixed(2)}</Text>
-                    <Text style={styles.assetCode}>{assetLabel}</Text>
+                    <Text style={styles.amount}>{parseFloat(primaryAmount).toFixed(2)}</Text>
+                    <Text style={styles.assetCode}>{primaryAsset}</Text>
+                    {isPathPayment && (
+                        <View style={styles.conversionRow}>
+                            <Ionicons name="arrow-down" size={16} color="#059669" />
+                            <Text style={styles.conversionText}>
+                                {parseFloat(PathPaymentUtils.getSecondaryAmount(transaction)).toFixed(2)} {PathPaymentUtils.getSecondaryAsset(transaction)}
+                            </Text>
+                        </View>
+                    )}
                     <View style={styles.statusBadge}>
                         <Ionicons name="checkmark-circle" size={16} color="#10B981" />
-                        <Text style={styles.statusText}>Completed</Text>
+                        <Text style={styles.statusText}>{operationTypeLabel}</Text>
                     </View>
                 </View>
 
@@ -326,7 +356,126 @@ View on Stellar Explorer: https://stellar.expert/explorer/public/tx/${transactio
                             </TouchableOpacity>
                         </View>
                     )}
+
+                    {transaction.from && (
+                        <View style={styles.infoRow}>
+                            <Text style={styles.infoLabel}>From</Text>
+                            <TouchableOpacity 
+                                onPress={() => handleCopy(transaction.from!, 'from')}
+                                style={styles.copyableRow}
+                            >
+                                <Text style={styles.infoValue} numberOfLines={1}>
+                                    {transaction.from.slice(0, 10)}…{transaction.from.slice(-8)}
+                                </Text>
+                                <Ionicons 
+                                    name={copiedField === 'from' ? 'checkmark' : 'copy-outline'} 
+                                    size={16} 
+                                    color={copiedField === 'from' ? '#10B981' : '#6B7280'} 
+                                />
+                            </TouchableOpacity>
+                        </View>
+                    )}
+
+                    {transaction.to && (
+                        <View style={styles.infoRow}>
+                            <Text style={styles.infoLabel}>To</Text>
+                            <TouchableOpacity 
+                                onPress={() => handleCopy(transaction.to!, 'to')}
+                                style={styles.copyableRow}
+                            >
+                                <Text style={styles.infoValue} numberOfLines={1}>
+                                    {transaction.to.slice(0, 10)}…{transaction.to.slice(-8)}
+                                </Text>
+                                <Ionicons 
+                                    name={copiedField === 'to' ? 'checkmark' : 'copy-outline'} 
+                                    size={16} 
+                                    color={copiedField === 'to' ? '#10B981' : '#6B7280'} 
+                                />
+                            </TouchableOpacity>
+                        </View>
+                    )}
                 </View>
+
+                {/* Path Payment Details */}
+                {isPathPayment && (
+                    <View style={styles.infoSection}>
+                        <Text style={styles.sectionTitle}>Path Payment Details</Text>
+                        
+                        <View style={styles.infoRow}>
+                            <Text style={styles.infoLabel}>Operation Type</Text>
+                            <Text style={styles.infoValue}>{operationTypeLabel}</Text>
+                        </View>
+
+                        <View style={styles.infoRow}>
+                            <Text style={styles.infoLabel}>Source Amount</Text>
+                            <TouchableOpacity 
+                                onPress={() => handleCopy(transaction.source_amount || '', 'sourceAmount')}
+                                style={styles.copyableRow}
+                            >
+                                <Text style={styles.infoValue}>
+                                    {parseFloat(transaction.source_amount || '0').toFixed(2)} {transaction.source_asset ? PathPaymentUtils.assetToString(transaction.source_asset) : 'N/A'}
+                                </Text>
+                                <Ionicons 
+                                    name={copiedField === 'sourceAmount' ? 'checkmark' : 'copy-outline'} 
+                                    size={16} 
+                                    color={copiedField === 'sourceAmount' ? '#10B981' : '#6B7280'} 
+                                />
+                            </TouchableOpacity>
+                        </View>
+
+                        <View style={styles.infoRow}>
+                            <Text style={styles.infoLabel}>Destination Amount</Text>
+                            <TouchableOpacity 
+                                onPress={() => handleCopy(transaction.amount, 'destAmount')}
+                                style={styles.copyableRow}
+                            >
+                                <Text style={styles.infoValue}>
+                                    {parseFloat(transaction.amount).toFixed(2)} {transaction.destination_asset ? PathPaymentUtils.assetToString(transaction.destination_asset) : 'N/A'}
+                                </Text>
+                                <Ionicons 
+                                    name={copiedField === 'destAmount' ? 'checkmark' : 'copy-outline'} 
+                                    size={16} 
+                                    color={copiedField === 'destAmount' ? '#10B981' : '#6B7280'} 
+                                />
+                            </TouchableOpacity>
+                        </View>
+
+                        <View style={styles.infoRow}>
+                            <Text style={styles.infoLabel}>Path Description</Text>
+                            <TouchableOpacity 
+                                onPress={() => handleCopy(PathPaymentUtils.createPathDescription(transaction), 'pathDesc')}
+                                style={styles.copyableRow}
+                            >
+                                <Text style={styles.infoValue} numberOfLines={2}>
+                                    {PathPaymentUtils.createPathDescription(transaction)}
+                                </Text>
+                                <Ionicons 
+                                    name={copiedField === 'pathDesc' ? 'checkmark' : 'copy-outline'} 
+                                    size={16} 
+                                    color={copiedField === 'pathDesc' ? '#10B981' : '#6B7280'} 
+                                />
+                            </TouchableOpacity>
+                        </View>
+
+                        {transaction.path && transaction.path.length > 0 && (
+                            <View style={styles.infoRow}>
+                                <Text style={styles.infoLabel}>Path Assets</Text>
+                                <View style={styles.pathAssetsList}>
+                                    {transaction.path.map((asset, index) => (
+                                        <View key={index} style={styles.pathAssetItem}>
+                                            <Text style={styles.pathAssetText}>
+                                                {PathPaymentUtils.assetToString(asset)}
+                                            </Text>
+                                            {index < transaction.path!.length - 1 && (
+                                                <Ionicons name="arrow-forward" size={12} color="#6B7280" />
+                                            )}
+                                        </View>
+                                    ))}
+                                </View>
+                            </View>
+                        )}
+                    </View>
+                )}
 
                 {/* Timeline */}
                 <View style={styles.timelineSection}>
@@ -589,5 +738,35 @@ const styles = StyleSheet.create({
     },
     bottomSpacer: {
         height: 20,
+    },
+    conversionRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginTop: 8,
+        gap: 6,
+    },
+    conversionText: {
+        fontSize: 14,
+        color: '#059669',
+        fontWeight: '500',
+    },
+    pathAssetsList: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        alignItems: 'center',
+        gap: 8,
+    },
+    pathAssetItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+    },
+    pathAssetText: {
+        fontSize: 12,
+        color: '#374151',
+        backgroundColor: '#F3F4F6',
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 6,
     },
 });

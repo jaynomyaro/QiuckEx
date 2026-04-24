@@ -8,6 +8,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import type { TransactionItem as TransactionItemType } from '../types/transaction';
+import { PathPaymentUtils } from '../utils/path-payment-utils';
 
 interface Props {
     item: TransactionItemType;
@@ -38,7 +39,10 @@ function shortenHash(hash: string): string {
 
 export default function TransactionItem({ item, accountId }: Props) {
     const router = useRouter();
-    const assetLabel = formatAsset(item.asset);
+    const isPathPayment = PathPaymentUtils.isPathPayment(item);
+    const primaryAsset = isPathPayment ? PathPaymentUtils.getPrimaryAsset(item) : formatAsset(item.asset);
+    const primaryAmount = isPathPayment ? PathPaymentUtils.getPrimaryAmount(item) : item.amount;
+    const operationTypeLabel = PathPaymentUtils.getOperationTypeLabel(item);
 
     const handleCopyHash = () => {
         Clipboard.setString(item.txHash);
@@ -59,19 +63,29 @@ export default function TransactionItem({ item, accountId }: Props) {
         <TouchableOpacity style={styles.row} onPress={handlePress} activeOpacity={0.7}>
             {/* Left: icon + asset */}
             <View style={styles.iconWrap}>
-                <Text style={styles.assetIcon}>{assetLabel.slice(0, 3)}</Text>
+                <Text style={styles.assetIcon}>{primaryAsset.slice(0, 3)}</Text>
             </View>
 
             {/* Middle: asset name, memo, date */}
             <View style={styles.middle}>
-                <Text style={styles.assetName}>
-                    {assetLabel}
-                </Text>
+                <View style={styles.assetRow}>
+                    <Text style={styles.assetName}>
+                        {primaryAsset}
+                    </Text>
+                    {isPathPayment && (
+                        <Text style={styles.operationType}>{operationTypeLabel}</Text>
+                    )}
+                </View>
                 {item.memo ? (
                     <Text style={styles.memo} numberOfLines={1}>
                         {item.memo}
                     </Text>
                 ) : null}
+                {isPathPayment && (
+                    <Text style={styles.pathDescription} numberOfLines={1}>
+                        {PathPaymentUtils.createPathDescription(item)}
+                    </Text>
+                )}
                 <TouchableOpacity onPress={handleCopyHash} activeOpacity={0.6}>
                     <Text style={styles.txHash}>{shortenHash(item.txHash)}</Text>
                 </TouchableOpacity>
@@ -81,9 +95,14 @@ export default function TransactionItem({ item, accountId }: Props) {
             {/* Right: amount */}
             <View style={styles.right}>
                 <Text style={styles.amount} numberOfLines={1} adjustsFontSizeToFit>
-                    {parseFloat(item.amount).toFixed(2)}
+                    {parseFloat(primaryAmount).toFixed(2)}
                 </Text>
-                <Text style={styles.assetCode}>{assetLabel}</Text>
+                <Text style={styles.assetCode}>{primaryAsset}</Text>
+                {isPathPayment && (
+                    <Text style={styles.secondaryAmount}>
+                        → {parseFloat(PathPaymentUtils.getSecondaryAmount(item)).toFixed(2)} {PathPaymentUtils.getSecondaryAsset(item)}
+                    </Text>
+                )}
             </View>
         </TouchableOpacity>
     );
@@ -118,14 +137,33 @@ const styles = StyleSheet.create({
         flex: 1,
         gap: 2,
     },
+    assetRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+    },
     assetName: {
         fontSize: 15,
         fontWeight: '600',
         color: '#111827',
     },
+    operationType: {
+        fontSize: 11,
+        fontWeight: '600',
+        color: '#3B82F6',
+        backgroundColor: '#EFF6FF',
+        paddingHorizontal: 6,
+        paddingVertical: 2,
+        borderRadius: 4,
+    },
     memo: {
         fontSize: 13,
         color: '#6B7280',
+    },
+    pathDescription: {
+        fontSize: 12,
+        color: '#059669',
+        fontStyle: 'italic',
     },
     txHash: {
         fontSize: 11,
@@ -151,5 +189,11 @@ const styles = StyleSheet.create({
         fontSize: 12,
         color: '#6B7280',
         marginTop: 2,
+    },
+    secondaryAmount: {
+        fontSize: 11,
+        color: '#059669',
+        marginTop: 2,
+        textAlign: 'right',
     },
 });

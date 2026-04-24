@@ -3,6 +3,7 @@ import { Horizon } from 'stellar-sdk';
 import { LRUCache } from 'lru-cache';
 import { AppConfigService } from '../config/app-config.service';
 import { TransactionItemDto, TransactionResponseDto } from './dto/transaction.dto';
+import { PathPaymentNormalizer } from './path-payment-normalizer';
 
 @Injectable()
 export class HorizonService {
@@ -147,19 +148,67 @@ export class HorizonService {
                             this.logger.warn(`Failed to fetch memo for transaction ${payment.transaction_hash}`);
                         }
 
+                        // Handle different payment types with normalization
+                        let normalizedPayment: any = payment;
+                        let operationType = payment.type;
                         let assetString = 'XLM';
-                        if ('asset_type' in payment && payment.asset_type !== 'native') {
-                            assetString = `${payment.asset_code}:${payment.asset_issuer}`;
+                        let amount = payment.amount;
+
+                        if (payment.type === 'path_payment_strict_send') {
+                            normalizedPayment = PathPaymentNormalizer.normalizePathPaymentStrictSend(
+                                payment as Horizon.ServerApi.PathPaymentStrictSendOperationRecord
+                            );
+                            operationType = 'path_payment_strict_send';
+                            assetString = PathPaymentNormalizer.assetToString(normalizedPayment.source_asset);
+                            amount = PathPaymentNormalizer.getPrimaryAmount(operationType, normalizedPayment.source_amount, normalizedPayment.amount);
+                        } else if (payment.type === 'path_payment_strict_receive') {
+                            normalizedPayment = PathPaymentNormalizer.normalizePathPaymentStrictReceive(
+                                payment as Horizon.ServerApi.PathPaymentOperationRecord
+                            );
+                            operationType = 'path_payment_strict_receive';
+                            assetString = PathPaymentNormalizer.assetToString(normalizedPayment.destination_asset);
+                            amount = PathPaymentNormalizer.getPrimaryAmount(operationType, normalizedPayment.source_amount, normalizedPayment.amount);
+                        } else {
+                            // Regular payment
+                            if ('asset_type' in payment && payment.asset_type !== 'native') {
+                                assetString = `${payment.asset_code}:${payment.asset_issuer}`;
+                            }
                         }
 
-                        return {
-                            amount: payment.amount,
+                        const baseItem: TransactionItemDto = {
+                            amount,
                             asset: assetString,
                             memo,
                             timestamp: payment.created_at,
                             txHash: payment.transaction_hash,
                             pagingToken: payment.paging_token,
+                            operation_type: operationType,
                         };
+
+                        // Add path payment specific fields
+                        if (operationType === 'path_payment_strict_send' || operationType === 'path_payment_strict_receive') {
+                            return {
+                                ...baseItem,
+                                from: normalizedPayment.from,
+                                to: normalizedPayment.to,
+                                source_asset: normalizedPayment.source_asset,
+                                source_amount: normalizedPayment.source_amount,
+                                destination_asset: normalizedPayment.destination_asset,
+                                destination_min: normalizedPayment.destination_min,
+                                path: normalizedPayment.path,
+                            };
+                        }
+
+                        // Add from/to fields for regular payments if available
+                        if ('from' in normalizedPayment && 'to' in normalizedPayment) {
+                            return {
+                                ...baseItem,
+                                from: normalizedPayment.from,
+                                to: normalizedPayment.to,
+                            };
+                        }
+
+                        return baseItem;
                     }),
                 );
 

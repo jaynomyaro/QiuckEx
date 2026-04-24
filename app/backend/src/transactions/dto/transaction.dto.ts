@@ -52,6 +52,17 @@ export class GetTransactionsQueryDto {
   cursor?: string;
 }
 
+export class PathPaymentAssetDto {
+  @ApiProperty({ example: "native" })
+  asset_type: string;
+
+  @ApiPropertyOptional({ example: "USDC" })
+  asset_code?: string;
+
+  @ApiPropertyOptional({ example: "GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335XOP3IA2M65BZDCCXN2YRC2TH" })
+  asset_issuer?: string;
+}
+
 export class TransactionItemDto {
   @ApiProperty({ example: "100.5000000" })
   amount: string;
@@ -70,6 +81,30 @@ export class TransactionItemDto {
 
   @ApiProperty({ example: "1234567890" })
   pagingToken: string;
+
+  @ApiPropertyOptional({ example: "payment" })
+  operation_type?: string;
+
+  @ApiPropertyOptional({ example: "GD...FROM" })
+  from?: string;
+
+  @ApiPropertyOptional({ example: "GD...TO" })
+  to?: string;
+
+  @ApiPropertyOptional(() => PathPaymentAssetDto)
+  source_asset?: PathPaymentAssetDto;
+
+  @ApiPropertyOptional({ example: "50.0000000" })
+  source_amount?: string;
+
+  @ApiPropertyOptional(() => PathPaymentAssetDto)
+  destination_asset?: PathPaymentAssetDto;
+
+  @ApiPropertyOptional({ example: "0.0000000" })
+  destination_min?: string;
+
+  @ApiPropertyOptional(() => [PathPaymentAssetDto])
+  path?: PathPaymentAssetDto[];
 }
 
 export class TransactionResponseDto {
