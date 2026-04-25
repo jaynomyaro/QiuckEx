@@ -87,7 +87,21 @@ export default function PaymentConfirmationV2Screen() {
     }
 
     // Authenticate first
-    const authorized = await authenticateForSensitiveAction('payment_authorization');
+    const authorized = await authenticateForSensitiveAction(
+      'payment_authorization',
+      {
+        title: 'Signed Action Required',
+        description: 'You are about to send funds from your wallet.',
+        riskLabel: 'HIGH RISK: FUNDS TRANSFER',
+        details: [
+          `Recipient: @${username}`,
+          `Amount: ${amount} ${asset}`,
+          memo ? `Memo: ${memo}` : 'Memo: none',
+          isPrivate ? 'Privacy mode: enabled' : 'Privacy mode: disabled',
+        ],
+        acknowledgementText: 'SIGN',
+      },
+    );
     if (!authorized) {
       Alert.alert(
         'Authentication Required',

@@ -59,6 +59,17 @@ export default function WalletConnectScreen() {
   const revealSessionToken = async () => {
     const authorized = await authenticateForSensitiveAction(
       "sensitive_data_access",
+      {
+        title: "Signed Action Required",
+        description: "You are about to reveal a stored wallet session token.",
+        riskLabel: "HIGH RISK: SENSITIVE DATA",
+        details: [
+          `Network: ${network.toUpperCase()}`,
+          `Wallet: ${publicKey ?? "not connected"}`,
+          "This can expose session material on screen.",
+        ],
+        acknowledgementText: "SIGN",
+      },
     );
     if (!authorized) {
       Alert.alert(

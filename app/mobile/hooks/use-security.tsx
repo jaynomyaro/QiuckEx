@@ -11,6 +11,7 @@ import React, {
 import { AppState, Platform } from "react-native";
 
 import { PinAuthModal } from "@/components/security/pin-auth-modal";
+import { SignedActionModal } from "@/components/security/signed-action-modal";
 import {
     clearSensitiveToken,
     getSecuritySettings,
@@ -21,7 +22,11 @@ import {
     setFallbackPin,
     verifyFallbackPin,
 } from "@/services/security";
-import type { SecurityAuthReason, SecuritySettings } from "@/types/security";
+import type {
+  SecurityAuthReason,
+  SecuritySettings,
+  SignedActionPrompt,
+} from "@/types/security";
 
 interface ToggleResult {
   ok: boolean;
@@ -44,6 +49,7 @@ interface SecurityContextValue {
   unlockApp: () => Promise<boolean>;
   authenticateForSensitiveAction: (
     reason: SecurityAuthReason,
+    signedActionPrompt?: SignedActionPrompt,
   ) => Promise<boolean>;
   saveSensitiveSessionToken: (token: string) => Promise<void>;
   getSensitiveSessionToken: () => Promise<string | null>;
@@ -92,8 +98,23 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
   const [pinInput, setPinInput] = useState("");
   const [pinError, setPinError] = useState<string | null>(null);
   const [verifyingPin, setVerifyingPin] = useState(false);
+  const [signedActionVisible, setSignedActionVisible] = useState(false);
+  const [signedActionTitle, setSignedActionTitle] = useState("");
+  const [signedActionDescription, setSignedActionDescription] = useState("");
+  const [signedActionRiskLabel, setSignedActionRiskLabel] = useState("");
+  const [signedActionDetails, setSignedActionDetails] = useState<string[]>([]);
+  const [signedActionAcknowledgementText, setSignedActionAcknowledgementText] =
+    useState("SIGN");
+  const [signedActionInput, setSignedActionInput] = useState("");
+  const [signedActionError, setSignedActionError] = useState<string | null>(
+    null,
+  );
+  const [signingAction, setSigningAction] = useState(false);
 
   const pinResolverRef = useRef<((result: boolean) => void) | null>(null);
+  const signedActionResolverRef = useRef<((result: boolean) => void) | null>(
+    null,
+  );
   const shouldLockOnNextActiveRef = useRef(false);
 
   const initialize = useCallback(async () => {
@@ -155,6 +176,31 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
     setPinError(null);
   }, []);
 
+  const openSignedActionPrompt = useCallback((prompt: SignedActionPrompt) => {
+    return new Promise<boolean>((resolve) => {
+      signedActionResolverRef.current = resolve;
+      setSignedActionTitle(prompt.title);
+      setSignedActionDescription(prompt.description);
+      setSignedActionRiskLabel(prompt.riskLabel);
+      setSignedActionDetails(prompt.details ?? []);
+      setSignedActionAcknowledgementText(prompt.acknowledgementText ?? "SIGN");
+      setSignedActionInput("");
+      setSignedActionError(null);
+      setSignedActionVisible(true);
+    });
+  }, []);
+
+  const resolveSignedActionPrompt = useCallback((result: boolean) => {
+    if (signedActionResolverRef.current) {
+      signedActionResolverRef.current(result);
+      signedActionResolverRef.current = null;
+    }
+    setSignedActionVisible(false);
+    setSignedActionInput("");
+    setSignedActionError(null);
+    setSigningAction(false);
+  }, []);
+
   const tryBiometricAuth = useCallback(
     async (reason: SecurityAuthReason) => {
       if (!settings.biometricLockEnabled || !isBiometricAvailable) {
@@ -184,7 +230,15 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
   );
 
   const authenticateForSensitiveAction = useCallback(
-    async (reason: SecurityAuthReason) => {
+    async (
+      reason: SecurityAuthReason,
+      signedActionPrompt?: SignedActionPrompt,
+    ) => {
+      if (signedActionPrompt) {
+        const actionSigned = await openSignedActionPrompt(signedActionPrompt);
+        if (!actionSigned) return false;
+      }
+
       if (!settings.biometricLockEnabled) return true;
 
       const biometricOk = await tryBiometricAuth(reason);
@@ -196,6 +250,7 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
     },
     [
       hasPinConfigured,
+      openSignedActionPrompt,
       openPinPrompt,
       settings.biometricLockEnabled,
       tryBiometricAuth,
@@ -318,6 +373,30 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
     resolvePinPrompt(false);
   }, [resolvePinPrompt]);
 
+  const onSubmitSignedAction = useCallback(() => {
+    const expected = signedActionAcknowledgementText.trim().toUpperCase();
+    const actual = signedActionInput.trim().toUpperCase();
+    setSigningAction(true);
+
+    if (actual !== expected) {
+      setSigningAction(false);
+      setSignedActionError(
+        `Type "${signedActionAcknowledgementText}" exactly to continue.`,
+      );
+      return;
+    }
+
+    resolveSignedActionPrompt(true);
+  }, [
+    resolveSignedActionPrompt,
+    signedActionAcknowledgementText,
+    signedActionInput,
+  ]);
+
+  const onCancelSignedAction = useCallback(() => {
+    resolveSignedActionPrompt(false);
+  }, [resolveSignedActionPrompt]);
+
   return (
     <SecurityContext.Provider value={contextValue}>
       {children}
@@ -334,6 +413,23 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
         }}
         onSubmit={onSubmitPin}
         onCancel={onCancelPin}
+      />
+      <SignedActionModal
+        visible={signedActionVisible}
+        title={signedActionTitle}
+        description={signedActionDescription}
+        riskLabel={signedActionRiskLabel}
+        details={signedActionDetails}
+        acknowledgementText={signedActionAcknowledgementText}
+        confirmationInput={signedActionInput}
+        errorMessage={signedActionError}
+        submitting={signingAction}
+        onConfirmationInputChange={(value) => {
+          setSignedActionInput(value);
+          if (signedActionError) setSignedActionError(null);
+        }}
+        onConfirm={onSubmitSignedAction}
+        onCancel={onCancelSignedAction}
       />
     </SecurityContext.Provider>
   );
